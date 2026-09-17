@@ -38,17 +38,6 @@ export type DbUidLog = {
   created_at: string;
 };
 
-type DbState = {
-  users: DbUser[];
-  user_roles: { id: string; user_id: string; role: ResellerRole; created_at: string }[];
-  role_orders: DbRoleOrder[];
-  uid_logs: DbUidLog[];
-};
-
-declare global {
-  var __dbStateSingleton: DbState | undefined;
-}
-
 const SUPABASE_URL =
   process.env.VITE_SUPABASE_URL ||
   process.env.SUPABASE_URL ||
@@ -62,105 +51,40 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-const DEFAULT_INITIAL_STATE: DbState = {
-  users: [
-    {
-      id: "usr_owner_grej",
-      username: "grej",
-      email: "grej@grejlabs.local",
-      password_hash: "987760",
-      display_name: "Grej (Owner)",
-      approved: true,
-      role: "admin",
-      uid_limit: 999999,
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: "usr_master_ali",
-      username: "alisaleem98776",
-      email: "alisaleem98776@gmail.com",
-      password_hash: "987760",
-      display_name: "Master Admin",
-      approved: true,
-      role: "admin",
-      uid_limit: 999999,
-      created_at: new Date().toISOString(),
-    },
-  ],
-  user_roles: [],
-  role_orders: [],
-  uid_logs: [],
-};
-
-async function loadDbFromSupabase(): Promise<DbState> {
-  if (globalThis.__dbStateSingleton) {
-    return globalThis.__dbStateSingleton;
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from("role_orders")
-      .select("*")
-      .eq("id", "SYS_CLOUD_DB")
-      .maybeSingle();
-
-    if (data && data.tx_id) {
-      const parsed = JSON.parse(data.tx_id) as DbState;
-      if (parsed && Array.isArray(parsed.users)) {
-        globalThis.__dbStateSingleton = parsed;
-        return parsed;
-      }
-    }
-  } catch (err) {
-    console.error("[Supabase Cloud DB Read Error]", err);
-  }
-
-  globalThis.__dbStateSingleton = DEFAULT_INITIAL_STATE;
-  saveDbToSupabase(DEFAULT_INITIAL_STATE).catch(() => {});
-  return DEFAULT_INITIAL_STATE;
-}
-
-function loadDbSync(): DbState {
-  if (globalThis.__dbStateSingleton) {
-    return globalThis.__dbStateSingleton;
-  }
-  // If not loaded yet, initiate async fetch and return default
-  loadDbFromSupabase().catch(() => {});
-  return DEFAULT_INITIAL_STATE;
-}
-
-async function saveDbToSupabase(state: DbState): Promise<void> {
-  globalThis.__dbStateSingleton = state;
-  try {
-    await supabase.from("role_orders").upsert({
-      id: "SYS_CLOUD_DB",
-      email: "system@grejlabs.local",
-      pkg: "CLOUD_DB",
-      amount: 0,
-      method: "POSTGRES",
-      tx_id: JSON.stringify(state),
-      status: "ACTIVE",
-    });
-  } catch (err) {
-    console.error("[Supabase Cloud DB Write Error]", err);
-  }
-}
-
 export const mysqlDb = {
   async getUsers(): Promise<DbUser[]> {
-    const state = await loadDbFromSupabase();
-    return state.users;
+    try {
+      const { data, error } = await supabase
+        .from("role_orders")
+        .select("*")
+        .eq("status", "USER_ACCOUNT");
+
+      if (data && data.length > 0) {
+        return data
+          .map((row) => {
+            try {
+              return JSON.parse(row.tx_id) as DbUser;
+            } catch {
+              return null;
+            }
+          })
+          .filter((u): u is DbUser => u !== null);
+      }
+    } catch (err) {
+      console.error("[Supabase getUsers Error]", err);
+    }
+    return [];
   },
 
   async findUserById(id: string): Promise<DbUser | undefined> {
-    const state = await loadDbFromSupabase();
-    return state.users.find((u) => u.id === id);
+    const users = await this.getUsers();
+    return users.find((u) => u.id === id);
   },
 
   async findUserByCredential(identifier: string): Promise<DbUser | undefined> {
-    const state = await loadDbFromSupabase();
+    const users = await this.getUsers();
     const clean = identifier.trim().toLowerCase();
-    return state.users.find(
+    return users.find(
       (u) =>
         u.username.toLowerCase() === clean ||
         u.email.toLowerCase() === clean ||
@@ -169,7 +93,6 @@ export const mysqlDb = {
   },
 
   async createUser(user: Omit<DbUser, "id" | "created_at">): Promise<DbUser> {
-    const state = await loadDbFromSupabase();
     const id = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const newUser: DbUser = {
       ...user,
@@ -178,101 +101,142 @@ export const mysqlDb = {
       created_at: new Date().toISOString(),
     };
 
-    state.users = state.users.filter(
-      (u) =>
-        u.username.toLowerCase() !== newUser.username.toLowerCase() &&
-        u.email.toLowerCase() !== newUser.email.toLowerCase()
-    );
+    const rowId = `USR_${newUser.username.toLowerCase()}`;
+    await supabase.from("role_orders").upsert({
+      id: rowId,
+      email: newUser.email,
+      pkg: newUser.role,
+      amount: newUser.uid_limit,
+      method: newUser.password_hash,
+      tx_id: JSON.stringify(newUser),
+      status: "USER_ACCOUNT",
+    });
 
-    state.users.push(newUser);
-
-    if (newUser.role === "admin") {
-      state.user_roles.push({
-        id: `ur_${Date.now()}`,
-        user_id: id,
-        role: "admin",
-        created_at: new Date().toISOString(),
-      });
-    }
-
-    await saveDbToSupabase(state);
     return newUser;
   },
 
   async updateUser(id: string, patch: Partial<DbUser>): Promise<DbUser | null> {
-    const state = await loadDbFromSupabase();
-    const index = state.users.findIndex((u) => u.id === id);
-    if (index === -1) return null;
+    const users = await this.getUsers();
+    const existing = users.find((u) => u.id === id);
+    if (!existing) return null;
 
-    state.users[index] = { ...state.users[index], ...patch };
+    const updatedUser: DbUser = { ...existing, ...patch };
+    const rowId = `USR_${updatedUser.username.toLowerCase()}`;
 
-    if (patch.role) {
-      if (patch.role === "admin") {
-        if (!state.user_roles.some((r) => r.user_id === id && r.role === "admin")) {
-          state.user_roles.push({
-            id: `ur_${Date.now()}`,
-            user_id: id,
-            role: "admin",
-            created_at: new Date().toISOString(),
-          });
-        }
-      } else {
-        state.user_roles = state.user_roles.filter(
-          (r) => !(r.user_id === id && r.role === "admin")
-        );
-      }
-    }
+    await supabase.from("role_orders").upsert({
+      id: rowId,
+      email: updatedUser.email,
+      pkg: updatedUser.role,
+      amount: updatedUser.uid_limit,
+      method: updatedUser.password_hash,
+      tx_id: JSON.stringify(updatedUser),
+      status: "USER_ACCOUNT",
+    });
 
-    await saveDbToSupabase(state);
-    return state.users[index];
+    return updatedUser;
   },
 
   async deleteUser(id: string): Promise<void> {
-    const state = await loadDbFromSupabase();
-    state.users = state.users.filter((u) => u.id !== id);
-    state.user_roles = state.user_roles.filter((r) => r.user_id !== id);
-    await saveDbToSupabase(state);
+    const users = await this.getUsers();
+    const existing = users.find((u) => u.id === id);
+    if (!existing) return;
+
+    const rowId = `USR_${existing.username.toLowerCase()}`;
+    await supabase.from("role_orders").delete().eq("id", rowId);
   },
 
   async getOrders(): Promise<DbRoleOrder[]> {
-    const state = await loadDbFromSupabase();
-    return state.role_orders;
+    try {
+      const { data } = await supabase
+        .from("role_orders")
+        .select("*")
+        .neq("status", "USER_ACCOUNT")
+        .neq("status", "ACTIVE");
+
+      return (data ?? []).map((row) => ({
+        id: row.id,
+        email: row.email,
+        pkg: row.pkg,
+        amount: Number(row.amount),
+        method: row.method,
+        tx_id: row.tx_id,
+        status: row.status,
+        created_at: row.created_at,
+      }));
+    } catch {
+      return [];
+    }
   },
 
   async addOrder(order: Omit<DbRoleOrder, "created_at">): Promise<DbRoleOrder> {
-    const state = await loadDbFromSupabase();
     const newOrder: DbRoleOrder = {
       ...order,
       created_at: new Date().toISOString(),
     };
-    state.role_orders.unshift(newOrder);
-    await saveDbToSupabase(state);
+
+    await supabase.from("role_orders").insert([{
+      id: newOrder.id,
+      email: newOrder.email,
+      pkg: newOrder.pkg,
+      amount: newOrder.amount,
+      method: newOrder.method,
+      tx_id: newOrder.tx_id,
+      status: newOrder.status,
+    }]);
+
     return newOrder;
   },
 
   async updateOrderStatus(orderId: string, status: string): Promise<void> {
-    const state = await loadDbFromSupabase();
-    const order = state.role_orders.find((o) => o.id === orderId);
-    if (order) {
-      order.status = status;
-      await saveDbToSupabase(state);
-    }
+    await supabase.from("role_orders").update({ status }).eq("id", orderId);
   },
 
   async getLogs(limit = 40): Promise<DbUidLog[]> {
-    const state = await loadDbFromSupabase();
-    return state.uid_logs.slice(0, limit);
+    try {
+      const { data } = await supabase
+        .from("uid_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+
+      return (data ?? []).map((row) => ({
+        id: row.id,
+        user_id: row.user_id,
+        action: row.action,
+        uid: row.uid,
+        target_uid: row.target_uid,
+        days: row.days,
+        credits_used: row.credits_used ?? 0,
+        success: row.status === "success" || row.success === true,
+        message: row.message ?? "",
+        created_at: row.created_at,
+      }));
+    } catch {
+      return [];
+    }
   },
 
   async addLog(log: Omit<DbUidLog, "id" | "created_at">): Promise<DbUidLog> {
-    const state = await loadDbFromSupabase();
     const newLog: DbUidLog = {
       ...log,
       id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       created_at: new Date().toISOString(),
     };
-    state.uid_logs.unshift(newLog);
-    await saveDbToSupabase(state);
+
+    try {
+      await supabase.from("uid_logs").insert([{
+        user_id: newLog.user_id,
+        action: newLog.action,
+        uid: newLog.uid,
+        target_uid: newLog.target_uid,
+        days: newLog.days,
+        status: newLog.success ? "success" : "failed",
+        message: newLog.message,
+      }]);
+    } catch (err) {
+      console.error("[Add Log Error]", err);
+    }
+
     return newLog;
   },
 };
