@@ -1,0 +1,163 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,600&family=Outfit:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * GrejLabs Design System — "Royal Velvet Lacquer"
+ * Deep royal emerald (#020d08), gilded 24k gold (#dfa837), serif royal display & obsidian glass.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-gold: var(--gold);
+  --color-gold-foreground: var(--gold-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --font-display: "Cormorant Garamond", Georgia, serif;
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+:root {
+  --radius: 0.85rem;
+
+  --background: #020d08;
+  --foreground: #f4f7f5;
+
+  --card: #061810;
+  --card-foreground: #f4f7f5;
+
+  --popover: #061810;
+  --popover-foreground: #f4f7f5;
+
+  --primary: #dfa837;
+  --primary-foreground: #04120b;
+
+  --secondary: #092418;
+  --secondary-foreground: #f4f7f5;
+
+  --muted: #0a291b;
+  --muted-foreground: #94a89d;
+
+  --accent: #113826;
+  --accent-foreground: #f4f7f5;
+
+  --destructive: #ef4444;
+  --destructive-foreground: #f8fafc;
+
+  --success: #10b981;
+  --success-foreground: #022c22;
+
+  --gold: #f3c868;
+  --gold-foreground: #04120b;
+
+  --border: rgba(223, 168, 55, 0.28);
+  --input: rgba(9, 36, 24, 0.8);
+  --ring: #f3c868;
+
+  --gradient-royal: radial-gradient(circle at 50% -10%, rgba(223, 168, 55, 0.18), transparent 70%),
+                    radial-gradient(circle at 0% 50%, rgba(16, 185, 129, 0.12), transparent 60%),
+                    linear-gradient(to bottom, #020d08, #051910, #020d08);
+  --gradient-gold: linear-gradient(135deg, #ffe49e 0%, #f3c868 40%, #dfa837 70%, #b88219 100%);
+  --shadow-royal: 0 20px 60px -15px rgba(0, 0, 0, 0.8), 0 0 30px rgba(223, 168, 55, 0.12);
+  --shadow-gold: 0 0 25px rgba(243, 200, 104, 0.3);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    color-scheme: dark;
+  }
+
+  /* Custom Royal Scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #020d08;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #0d3623;
+    border-radius: 4px;
+    border: 1px solid rgba(223, 168, 55, 0.4);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #dfa837;
+  }
+
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    background-image: var(--gradient-royal);
+    background-attachment: fixed;
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    overflow-x: hidden;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+}
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(22px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@utility animate-rise {
+  animation: rise-in 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@utility text-gilded {
+  background-image: var(--gradient-gold);
+  background-clip: text;
+  color: transparent;
+}
+
+@utility panel-royal {
+  background: linear-gradient(145deg, rgba(6, 24, 16, 0.85), rgba(3, 15, 10, 0.9));
+  border: 1px solid rgba(223, 168, 55, 0.35);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-royal);
+  backdrop-filter: blur(20px);
+}
