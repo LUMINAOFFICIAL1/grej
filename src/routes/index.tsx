@@ -30,7 +30,7 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-const DISCORD_LINK = "https://discord.gg/jDYvcPbx5v";
+const DISCORD_LINK = "https://discord.gg/grej";
 
 function Index() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
