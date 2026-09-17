@@ -41,10 +41,17 @@ export type DbUidLog = {
 const SUPABASE_URL =
   process.env.VITE_SUPABASE_URL ||
   process.env.SUPABASE_URL ||
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  process.env.PUBLIC_SUPABASE_URL ||
   "https://truqxykzqgmsikcalabo.supabase.co";
 
 const SUPABASE_SERVICE_ROLE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_SECRET_KEY ||
+  process.env.SUPABASE_SERVICE_KEY ||
+  process.env.SUPABASE_ANON_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  process.env.VITE_SUPABASE_ANON_KEY ||
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRydXF4eWt6cWdtc2lrY2FsYWJvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4OTY0NTAxMSwiZXhwIjoyMTA1MjIxMDExfQ.ru75XKV-YDeRH6MQUPcO7gZpwjWYjDYKHa29QOU8lPE";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
@@ -70,6 +77,8 @@ export const mysqlDb = {
           })
           .filter((u): u is DbUser => u !== null);
       }
+
+      return [];
     } catch (err) {
       console.error("[Supabase getUsers Error]", err);
     }
